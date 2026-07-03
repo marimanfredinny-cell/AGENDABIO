@@ -95,9 +95,21 @@ export interface GoogleIntegration {
   calendar_id: string;
 }
 
+export interface NewProfessional {
+  display_name: string;
+  specialty_slug: string;
+  registration_number?: string;
+  email?: string;
+  phone?: string;
+  plan?: string;
+  billing?: 'mensal' | 'anual';
+}
+
 export interface Store {
   getPublicProfileBySlug(slug: string): Promise<PublicProfile | null>;
   getPublicProfileById(professionalId: string): Promise<PublicProfile | null>;
+  listSpecialties(): Promise<Specialty[]>;
+  createProfessional(input: NewProfessional): Promise<{ slug: string }>;
   // Google Calendar (professional_integration provider='google_calendar')
   getGoogleIntegration(professionalId: string): Promise<GoogleIntegration | null>;
   saveGoogleTokens(

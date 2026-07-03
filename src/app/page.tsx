@@ -10,6 +10,23 @@ export default function Home() {
         do profissional.
       </p>
       <p style={{ marginTop: '2rem' }}>
+        <a
+          href="/comecar"
+          style={{
+            display: 'inline-block',
+            padding: '0.8rem 1.4rem',
+            borderRadius: 14,
+            background: '#111',
+            color: '#fff',
+            fontWeight: 700,
+            textDecoration: 'none',
+          }}
+        >
+          Criar minha página →
+        </a>
+      </p>
+
+      <p style={{ marginTop: '1.5rem' }}>
         Exemplos ({IS_DEMO ? 'modo demo' : 'via Supabase'}):{' '}
         <a href="/dra-marina">/dra-marina</a> (psicóloga)
         {IS_DEMO && (

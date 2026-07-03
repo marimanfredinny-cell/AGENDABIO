@@ -63,6 +63,60 @@ export const supabaseStore: Store = {
     return buildProfile(db, professional);
   },
 
+  async listSpecialties() {
+    const db = admin();
+    const { data } = await db
+      .from('specialty')
+      .select('id, slug, label, council')
+      .eq('is_active', true)
+      .order('sort_order');
+    return data ?? [];
+  },
+
+  async createProfessional(input) {
+    const db = admin();
+    const { data: spec } = await db
+      .from('specialty')
+      .select('id')
+      .eq('slug', input.specialty_slug)
+      .single();
+    if (!spec) throw new Error('Especialidade inválida');
+
+    // slug único a partir do nome
+    let slug =
+      input.display_name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'profissional';
+    const { data: exists } = await db.from('professional').select('id').eq('slug', slug).maybeSingle();
+    if (exists) slug = `${slug}-${Math.floor(Math.random() * 900 + 100)}`;
+
+    const { data: prof, error } = await db
+      .from('professional')
+      .insert({
+        slug,
+        display_name: input.display_name,
+        specialty_id: spec.id,
+        registration_number: input.registration_number ?? null,
+        reply_to_email: input.email ?? null,
+      })
+      .select('id, slug')
+      .single();
+    if (error || !prof) throw new Error(error?.message ?? 'Falha ao criar profissional');
+
+    await db.from('service').insert({
+      professional_id: prof.id,
+      name: 'Primeira consulta',
+      modality: 'online',
+      visit_type: 'primeira',
+      duration_minutes: 50,
+      sort_order: 0,
+    });
+    return { slug: prof.slug };
+  },
+
   async getGoogleIntegration(professionalId) {
     const db = admin();
     const { data } = await db

@@ -56,7 +56,7 @@ const templates: Record<string, TriageTemplate> = {
   },
 };
 
-const profiles: PublicProfile[] = [
+const seedProfiles: PublicProfile[] = [
   {
     professional: {
       id: 'p-marina',
@@ -94,7 +94,27 @@ const profiles: PublicProfile[] = [
   },
 ];
 
-const conversations = new Map<string, Conversation>();
+// Estado mutável do demo em globalThis: no Next dev, route handlers e server
+// components são empacotados em grafos de módulo separados; sem o singleton
+// global, cada um teria sua própria cópia e o profissional criado no onboarding
+// não apareceria na página pública.
+type DemoState = { profiles: PublicProfile[]; conversations: Map<string, Conversation> };
+const g = globalThis as unknown as { __agendabioDemo?: DemoState };
+const demo: DemoState = (g.__agendabioDemo ??= {
+  profiles: seedProfiles,
+  conversations: new Map(),
+});
+const profiles = demo.profiles;
+const conversations = demo.conversations;
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
 
 export const demoStore: Store = {
   async getPublicProfileBySlug(slug) {
@@ -112,6 +132,38 @@ export const demoStore: Store = {
   },
   async getLeadEmail() {
     return null;
+  },
+  async listSpecialties() {
+    return specialties;
+  },
+  async createProfessional(input) {
+    const spec = specialties.find((s) => s.slug === input.specialty_slug);
+    const template = spec ? templates[spec.id] : undefined;
+    if (!spec || !template) throw new Error('Especialidade sem template');
+
+    let slug = slugify(input.display_name) || 'profissional';
+    if (profiles.some((p) => p.professional.slug === slug)) {
+      slug = `${slug}-${Math.floor(Math.random() * 900 + 100)}`;
+    }
+    const id = randomUUID();
+    profiles.push({
+      professional: {
+        id,
+        slug,
+        display_name: input.display_name,
+        avatar_url: null,
+        specialty_id: spec.id,
+        registration_number: input.registration_number ?? null,
+        timezone: 'America/Sao_Paulo',
+        reply_to_email: input.email ?? null,
+      },
+      specialty: spec,
+      template,
+      services: [
+        { id: `svc-${id}`, name: 'Primeira consulta', modality: 'online', visit_type: 'primeira', duration_minutes: 50 },
+      ],
+    });
+    return { slug };
   },
   async createConversation(professionalId, greeting) {
     const conv: Conversation = {
