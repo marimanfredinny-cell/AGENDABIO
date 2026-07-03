@@ -95,6 +95,29 @@ export interface GoogleIntegration {
   calendar_id: string;
 }
 
+export interface LeadRecord {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
+  reason: string | null;
+  urgency: 'urgente' | 'nao_urgente';
+  recurrence: 'primeira_vez' | 'recorrente';
+  status: string;
+  created_at: string;
+}
+
+export interface AppointmentRecord {
+  id: string;
+  starts_at: string;
+  ends_at: string;
+  modality: 'online' | 'presencial';
+  status: string;
+  lead_name: string | null;
+  service_name: string | null;
+  meeting_url: string | null;
+}
+
 export interface NewProfessional {
   display_name: string;
   specialty_slug: string;
@@ -110,6 +133,9 @@ export interface Store {
   getPublicProfileById(professionalId: string): Promise<PublicProfile | null>;
   listSpecialties(): Promise<Specialty[]>;
   createProfessional(input: NewProfessional): Promise<{ slug: string }>;
+  // Painel do profissional
+  listLeads(professionalId: string): Promise<LeadRecord[]>;
+  listAppointments(professionalId: string): Promise<AppointmentRecord[]>;
   // Google Calendar (professional_integration provider='google_calendar')
   getGoogleIntegration(professionalId: string): Promise<GoogleIntegration | null>;
   saveGoogleTokens(

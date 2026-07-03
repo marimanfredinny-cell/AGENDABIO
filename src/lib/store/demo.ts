@@ -4,13 +4,18 @@
 import { randomUUID } from 'crypto';
 import type {
   AppointmentInput,
+  AppointmentRecord,
   Conversation,
   LeadInput,
+  LeadRecord,
   PublicProfile,
   Specialty,
   Store,
   TriageTemplate,
 } from './types';
+
+type DemoLead = LeadRecord & { professional_id: string; conversation_id: string };
+type DemoAppt = AppointmentRecord & { professional_id: string; conversation_id: string };
 
 const specialties: Specialty[] = [
   { id: 's-clinico', slug: 'clinico-geral', label: 'Clínico(a) Geral', council: 'CRM' },
@@ -98,12 +103,24 @@ const seedProfiles: PublicProfile[] = [
 // components são empacotados em grafos de módulo separados; sem o singleton
 // global, cada um teria sua própria cópia e o profissional criado no onboarding
 // não apareceria na página pública.
-type DemoState = { profiles: PublicProfile[]; conversations: Map<string, Conversation> };
+type DemoState = {
+  profiles: PublicProfile[];
+  conversations: Map<string, Conversation>;
+  leads: DemoLead[];
+  appointments: DemoAppt[];
+};
 const g = globalThis as unknown as { __agendabioDemo?: DemoState };
 const demo: DemoState = (g.__agendabioDemo ??= {
   profiles: seedProfiles,
   conversations: new Map(),
+  leads: [],
+  appointments: [],
 });
+// Blindagem contra singleton antigo (hot-reload) que não tinha estes campos.
+demo.profiles ??= seedProfiles;
+demo.conversations ??= new Map();
+demo.leads ??= [];
+demo.appointments ??= [];
 const profiles = demo.profiles;
 const conversations = demo.conversations;
 
@@ -130,8 +147,8 @@ export const demoStore: Store = {
   async saveGoogleTokens() {
     /* no-op no demo */
   },
-  async getLeadEmail() {
-    return null;
+  async getLeadEmail(conversationId) {
+    return demo.leads.find((l) => l.conversation_id === conversationId)?.email ?? null;
   },
   async listSpecialties() {
     return specialties;
@@ -186,11 +203,57 @@ export const demoStore: Store = {
   async saveTriageAnswers() {
     /* no-op no demo (respostas ficam no histórico) */
   },
-  async upsertLead(_p, _c, _lead: LeadInput) {
-    return { id: randomUUID() };
+  async upsertLead(professionalId, conversationId, lead: LeadInput) {
+    const existing = demo.leads.find((l) => l.conversation_id === conversationId);
+    if (existing) {
+      Object.assign(existing, lead);
+      return { id: existing.id };
+    }
+    const rec: DemoLead = {
+      id: randomUUID(),
+      professional_id: professionalId,
+      conversation_id: conversationId,
+      full_name: lead.full_name,
+      phone: lead.phone,
+      email: lead.email ?? null,
+      reason: lead.reason ?? null,
+      urgency: lead.urgency,
+      recurrence: lead.recurrence,
+      status: 'novo',
+      created_at: new Date().toISOString(),
+    };
+    demo.leads.push(rec);
+    return { id: rec.id };
   },
-  async createAppointment(_p, _c, _a: AppointmentInput) {
-    return { id: randomUUID() };
+  async createAppointment(professionalId, conversationId, appt: AppointmentInput) {
+    const lead = demo.leads.find((l) => l.conversation_id === conversationId);
+    const profile = profiles.find((p) => p.professional.id === professionalId);
+    const service = profile?.services.find((s) => s.id === appt.service_id);
+    const rec: DemoAppt = {
+      id: randomUUID(),
+      professional_id: professionalId,
+      conversation_id: conversationId,
+      starts_at: appt.starts_at,
+      ends_at: appt.ends_at,
+      modality: appt.modality,
+      status: 'confirmado',
+      lead_name: lead?.full_name ?? null,
+      service_name: service?.name ?? null,
+      meeting_url: null,
+    };
+    if (lead) lead.status = 'agendado';
+    demo.appointments.push(rec);
+    return { id: rec.id };
+  },
+  async listLeads(professionalId) {
+    return demo.leads
+      .filter((l) => l.professional_id === professionalId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+  async listAppointments(professionalId) {
+    return demo.appointments
+      .filter((a) => a.professional_id === professionalId)
+      .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   },
   async enqueueNotification(n) {
     console.log(`[demo][email:${n.kind}] para ${n.to} @ ${n.scheduledFor}`);

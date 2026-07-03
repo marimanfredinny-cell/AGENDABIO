@@ -70,6 +70,20 @@ export default async function SucessoPage({
               >
                 Ver minha página →
               </Link>
+              <Link
+                href={`/painel/${slug}`}
+                style={{
+                  display: 'block',
+                  padding: '0.8rem',
+                  borderRadius: 14,
+                  border: '1px solid #ddd',
+                  color: '#111',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                Ir para o painel
+              </Link>
               <code style={{ color: '#888', fontSize: 13 }}>agendabio.com.br/{slug}</code>
             </div>
           )}

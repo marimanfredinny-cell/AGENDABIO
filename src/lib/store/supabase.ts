@@ -117,6 +117,37 @@ export const supabaseStore: Store = {
     return { slug: prof.slug };
   },
 
+  async listLeads(professionalId) {
+    const db = admin();
+    const { data } = await db
+      .from('lead')
+      .select('id, full_name, phone, email, reason, urgency, recurrence, status, created_at')
+      .eq('professional_id', professionalId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    return data ?? [];
+  },
+
+  async listAppointments(professionalId) {
+    const db = admin();
+    const { data } = await db
+      .from('appointment')
+      .select('id, starts_at, ends_at, modality, status, meeting_url, lead(full_name), service(name)')
+      .eq('professional_id', professionalId)
+      .order('starts_at', { ascending: true })
+      .limit(100);
+    return (data ?? []).map((a: any) => ({
+      id: a.id,
+      starts_at: a.starts_at,
+      ends_at: a.ends_at,
+      modality: a.modality,
+      status: a.status,
+      meeting_url: a.meeting_url,
+      lead_name: a.lead?.full_name ?? null,
+      service_name: a.service?.name ?? null,
+    }));
+  },
+
   async getGoogleIntegration(professionalId) {
     const db = admin();
     const { data } = await db
