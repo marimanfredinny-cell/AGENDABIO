@@ -1,53 +1,53 @@
 import { notFound } from 'next/navigation';
-import { supabaseAdmin } from '@/lib/supabase/server';
+import { store } from '@/lib/store';
 import Chat from '@/components/Chat';
 
-// Página pública do link na bio: /dra-marina
-export default async function BioPage({
-  params,
-}: {
-  params: { slug: string };
-}) {
-  const db = supabaseAdmin();
-  const { data: prof } = await db
-    .from('professional')
-    .select('display_name, headline, avatar_url')
-    .eq('slug', params.slug)
-    .eq('is_active', true)
-    .single();
+// Página pública gerada automaticamente a partir do cadastro do profissional.
+// A especialidade define o template de triagem usado pelo concierge.
+export default async function BioPage({ params }: { params: { slug: string } }) {
+  const profile = await store.getPublicProfileBySlug(params.slug);
+  if (!profile) notFound();
 
-  if (!prof) notFound();
+  const { professional, specialty } = profile;
+  const credential = professional.registration_number
+    ? professional.registration_number
+    : specialty.council;
 
   return (
     <main style={{ maxWidth: 520, margin: '0 auto', padding: '2rem 1.25rem' }}>
       <header style={{ textAlign: 'center', marginBottom: '1rem' }}>
-        {prof.avatar_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={prof.avatar_url}
-            alt={prof.display_name}
-            width={72}
-            height={72}
-            style={{ borderRadius: '50%', objectFit: 'cover' }}
-          />
-        )}
-        <h1 style={{ fontSize: '1.4rem', margin: '0.5rem 0 0.15rem' }}>
-          {prof.display_name}
+        <div
+          style={{
+            width: 76,
+            height: 76,
+            borderRadius: '50%',
+            margin: '0 auto',
+            background: '#cfe3d8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 28,
+            fontWeight: 700,
+            color: '#2e5b48',
+          }}
+        >
+          {professional.display_name.charAt(0)}
+        </div>
+        <h1 style={{ fontSize: '1.4rem', margin: '0.6rem 0 0.15rem' }}>
+          {professional.display_name}
         </h1>
-        {prof.headline && (
-          <p style={{ color: '#666', margin: 0 }}>{prof.headline}</p>
-        )}
+        <p style={{ color: '#5a6b62', margin: 0 }}>
+          {specialty.label} · {credential}
+        </p>
       </header>
 
-      <div
-        style={{
-          background: '#efe9e1',
-          borderRadius: 20,
-          padding: '1rem',
-        }}
-      >
+      <div style={{ background: '#e7efe9', borderRadius: 20, padding: '1rem' }}>
         <Chat slug={params.slug} />
       </div>
+
+      <p style={{ textAlign: 'center', color: '#95a49b', fontSize: 12, marginTop: 12 }}>
+        powered by AgendaBio
+      </p>
     </main>
   );
 }

@@ -14,9 +14,11 @@ export default function Chat({ slug }: { slug: string }) {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const started = useRef(false);
 
-  // Inicia a conversa ao montar.
   useEffect(() => {
+    if (started.current) return;
+    started.current = true;
     (async () => {
       setLoading(true);
       const res = await fetch('/api/chat', {
@@ -29,9 +31,7 @@ export default function Chat({ slug }: { slug: string }) {
         setConversationId(data.conversationId);
         setMessages([{ role: 'assistant', content: data.reply }]);
       } else {
-        setMessages([
-          { role: 'assistant', content: 'Profissional não encontrado.' },
-        ]);
+        setMessages([{ role: 'assistant', content: 'Profissional não encontrado.' }]);
       }
       setLoading(false);
     })();
@@ -39,7 +39,7 @@ export default function Chat({ slug }: { slug: string }) {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, loading]);
 
   async function send() {
     if (!input.trim() || !conversationId || loading || done) return;
@@ -53,13 +53,13 @@ export default function Chat({ slug }: { slug: string }) {
       body: JSON.stringify({ conversationId, message: text }),
     });
     const data = await res.json();
-    setMessages((m) => [...m, { role: 'assistant', content: data.reply }]);
+    setMessages((m) => [...m, { role: 'assistant', content: data.reply ?? 'Erro.' }]);
     if (data.done) setDone(true);
     setLoading(false);
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '70vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '68vh' }}>
       <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 0' }}>
         {messages.map((m, i) => (
           <div
@@ -72,13 +72,13 @@ export default function Chat({ slug }: { slug: string }) {
           >
             <span
               style={{
-                maxWidth: '80%',
+                maxWidth: '82%',
                 padding: '0.6rem 0.85rem',
                 borderRadius: 16,
-                background: m.role === 'user' ? '#c98a5e' : '#fff',
-                color: m.role === 'user' ? '#fff' : '#1b1b1b',
+                background: m.role === 'user' ? '#2e8b6a' : '#fff',
+                color: m.role === 'user' ? '#fff' : '#16241d',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                lineHeight: 1.4,
+                lineHeight: 1.45,
                 whiteSpace: 'pre-wrap',
               }}
             >
@@ -87,14 +87,12 @@ export default function Chat({ slug }: { slug: string }) {
           </div>
         ))}
         {loading && (
-          <div style={{ color: '#999', fontSize: 14, padding: '0.35rem' }}>
-            digitando…
-          </div>
+          <div style={{ color: '#8aa398', fontSize: 14, padding: '0.35rem' }}>digitando…</div>
         )}
         <div ref={endRef} />
       </div>
 
-      {!done && (
+      {!done ? (
         <div style={{ display: 'flex', gap: 8, paddingTop: 8 }}>
           <input
             value={input}
@@ -106,8 +104,9 @@ export default function Chat({ slug }: { slug: string }) {
               flex: 1,
               padding: '0.7rem 0.9rem',
               borderRadius: 12,
-              border: '1px solid #ddd',
+              border: '1px solid #cdd9d1',
               fontSize: 15,
+              outline: 'none',
             }}
           />
           <button
@@ -117,7 +116,7 @@ export default function Chat({ slug }: { slug: string }) {
               padding: '0.7rem 1.1rem',
               borderRadius: 12,
               border: 'none',
-              background: '#c98a5e',
+              background: '#2e8b6a',
               color: '#fff',
               fontWeight: 600,
               cursor: 'pointer',
@@ -125,6 +124,10 @@ export default function Chat({ slug }: { slug: string }) {
           >
             Enviar
           </button>
+        </div>
+      ) : (
+        <div style={{ textAlign: 'center', color: '#2e8b6a', fontWeight: 600, padding: 8 }}>
+          ✓ Atendimento concluído
         </div>
       )}
     </div>

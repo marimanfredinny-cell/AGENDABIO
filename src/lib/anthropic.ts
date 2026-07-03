@@ -1,11 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-// Cliente único da API da Claude (Anthropic).
-// A chave vem de ANTHROPIC_API_KEY no ambiente (.env.local / Vercel).
-export const anthropic = new Anthropic();
+export const anthropic = new Anthropic(); // lê ANTHROPIC_API_KEY do ambiente
 
-// Modelo padrão dos agentes conversacionais.
-// Opus 4.8 = máxima qualidade de conversa/qualificação. Para alto volume e
-// custo mais baixo, troque por 'claude-sonnet-5' (ou 'claude-haiku-4-5' na
-// triagem simples) — a escolha é sua; a arquitetura não muda.
+// Opus 4.8 = máxima qualidade de conversa/qualificação. Para alto volume,
+// 'claude-sonnet-5' (conversa) ou 'claude-haiku-4-5' (triagem) reduzem custo
+// sem mudar a arquitetura. A escolha é sua.
 export const AGENT_MODEL = 'claude-opus-4-8';

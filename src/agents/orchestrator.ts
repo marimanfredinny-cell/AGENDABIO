@@ -1,134 +1,107 @@
 // =============================================================================
-// ORQUESTRADOR CENTRAL
+// ORQUESTRADOR CENTRAL — máquina de estados que costura os 4 agentes.
 //
-// Padrão escolhido: orquestrador central com máquina de estados (state machine),
-// NÃO agentes autônomos se chamando livremente. Motivos:
-//   - Fluxo de negócio é linear e previsível: triagem -> captura -> agendamento.
-//   - Cada agente é um especialista com prompt/tools próprios (baixo custo,
-//     menos alucinação) em vez de um mega-prompt.
-//   - O estado (`stage`) vive no banco (tabela conversation), então a jornada é
-//     retomável e o follow-up de abandono sabe exatamente onde a pessoa parou.
+// Padrão: orquestrador central (não agentes autônomos). O estado (`stage`) vive
+// na tabela `conversation`, então a jornada é retomável e o lembrete de abandono
+// sabe onde a pessoa parou. Os agentes não conversam entre si — o handoff é o
+// estado compartilhado no banco (resumo da triagem, intent, lead).
 //
-// A cada mensagem do visitante, o orquestrador:
-//   1. Carrega a conversa (histórico + stage) do Supabase.
-//   2. Roteia para o agente do stage atual.
-//   3. Se o agente sinalizar "done", persiste o resultado e AVANÇA o stage,
-//      podendo já rodar o próximo agente na mesma requisição.
-//   4. Devolve a próxima fala ao front-end e salva tudo.
+// Duas trilhas:
+//   - COM ANTHROPIC_API_KEY: agentes reais (Claude + tool use).
+//   - SEM chave (modo demo): motor determinístico que percorre o template.
 // =============================================================================
 
-import { supabaseAdmin } from '@/lib/supabase/server';
-import type { ChatMessage, Conversation, Professional, Service } from '@/lib/types';
+import { USE_CLAUDE } from '@/lib/config';
+import { store } from '@/lib/store';
+import type { ChatMessage, Conversation, PublicProfile, Stage } from '@/lib/store/types';
 import { runTriageTurn, type TriageResult } from './triagem';
-import { runLeadTurn, type LeadResult } from './lead';
-import { runSchedulingTurn, type ScheduleResult } from './agendamento';
+import { runLeadTurn } from './lead';
+import { runSchedulingTurn } from './agendamento';
 import { createEvent } from '@/lib/google/calendar';
-
-export interface OrchestratorInput {
-  conversationId: string;
-  userMessage: string;
-}
+import { demoStep } from '@/lib/demo/engine';
 
 export interface OrchestratorOutput {
   reply: string;
-  stage: Conversation['stage'];
-  done: boolean; // true quando a jornada chegou a 'concluido'
+  stage: Stage;
+  done: boolean;
 }
 
-function triageSummary(r: TriageResult): string {
-  const linhas = r.respostas.map((a) => `- ${a.pergunta} ${a.resposta}`);
-  return `Intenção: ${r.intent}${r.urgente ? ' (URGENTE)' : ''}\n${r.resumo}\n${linhas.join(
-    '\n',
-  )}`;
-}
+const TRIAGE_TAG = '[triagem]';
 
 export async function handleMessage(
-  input: OrchestratorInput,
+  conversationId: string,
+  userMessage: string,
 ): Promise<OrchestratorOutput> {
-  const db = supabaseAdmin();
-
-  // 1. Carrega conversa + profissional + serviços.
-  const { data: conv } = await db
-    .from('conversation')
-    .select('*')
-    .eq('id', input.conversationId)
-    .single();
+  const conv = await store.getConversation(conversationId);
   if (!conv) throw new Error('Conversa não encontrada');
+  const profile = await store.getPublicProfileById(conv.professional_id);
+  if (!profile) throw new Error('Profissional não encontrado');
 
-  const { data: prof } = await db
-    .from('professional')
-    .select('*')
-    .eq('id', conv.professional_id)
-    .single<Professional>();
-  if (!prof) throw new Error('Profissional não encontrado');
+  // ---- Trilha DEMO -------------------------------------------------------
+  if (!USE_CLAUDE) {
+    const step = await demoStep(store, profile, conv, userMessage);
+    const messages: ChatMessage[] = [
+      ...conv.messages,
+      { role: 'user', content: userMessage },
+      { role: 'assistant', content: step.reply },
+    ];
+    await store.updateConversation(conv.id, {
+      stage: step.stage,
+      intent: step.intent ?? conv.intent,
+      messages,
+    });
+    return { reply: step.reply, stage: step.stage, done: step.done };
+  }
 
-  const { data: services } = await db
-    .from('service')
-    .select('*')
-    .eq('professional_id', prof.id)
-    .eq('is_active', true)
-    .order('sort_order');
-
-  // 2. Anexa a mensagem do usuário ao histórico.
+  // ---- Trilha CLAUDE -----------------------------------------------------
   const history: ChatMessage[] = [
-    ...(conv.messages as ChatMessage[]),
-    { role: 'user', content: input.userMessage },
+    ...conv.messages,
+    { role: 'user', content: userMessage },
   ];
-
-  let stage = conv.stage as Conversation['stage'];
+  let stage = conv.stage;
+  let intent = conv.intent;
   let reply = '';
-
-  // 3. Máquina de estados. Um `while` permite encadear stages (ex.: terminar a
-  //    triagem e já pedir os dados de contato na mesma resposta) — mas paramos
-  //    assim que um agente devolve texto (precisa de input do visitante).
   let guard = 0;
+
   while (guard++ < 4) {
     if (stage === 'triagem') {
       const turn = await runTriageTurn(history, {
-        professionalName: prof.display_name,
-        specialty: prof.specialty ?? undefined,
-        niche: prof.niche,
+        professionalName: profile.professional.display_name,
+        specialtyLabel: profile.specialty.label,
+        personaNote: profile.template.persona_note,
+        questions: profile.template.questions,
       });
       if (turn.done) {
-        await persistTriage(conv.id, turn.done);
-        await db
-          .from('conversation')
-          .update({ intent: turn.done.intent, stage: 'captura' })
-          .eq('id', conv.id);
+        await store.saveTriageAnswers(conv.id, turn.done.respostas);
+        intent = turn.done.intent;
         stage = 'captura';
-        // guarda o resumo no histórico como contexto interno
         history.push({
           role: 'assistant',
-          content: `[triagem concluída] ${triageSummary(turn.done)}`,
+          content: `${TRIAGE_TAG} ${summary(turn.done)}`,
         });
-        continue; // encadeia para a captura
+        continue;
       }
       reply = turn.reply ?? '';
       break;
     }
 
     if (stage === 'captura') {
-      const summary = lastTriageSummary(history);
+      const triageSummary = lastTag(history);
       const turn = await runLeadTurn(history, {
-        professionalName: prof.display_name,
-        triageSummary: summary,
+        professionalName: profile.professional.display_name,
+        triageSummary,
       });
       if (turn.done) {
-        await persistLead(conv, turn.done, summary);
-        const nextStage =
-          conv.intent === 'agendar' ? 'agendamento' : 'concluido';
-        await db
-          .from('conversation')
-          .update({ stage: nextStage })
-          .eq('id', conv.id);
-        stage = nextStage;
-        if (nextStage === 'concluido') {
-          reply =
-            turn.reply ??
-            'Prontinho! Registrei seu contato, em breve retornam pra você.';
+        await store.upsertLead(profile.professional.id, conv.id, {
+          ...turn.done,
+          reason: turn.done.reason ?? triageSummary,
+        });
+        stage = intent === 'agendar' ? 'agendamento' : 'concluido';
+        if (stage === 'concluido') {
+          reply = turn.reply ?? 'Prontinho! Registrei seu contato, em breve retornam.';
           break;
         }
-        continue; // vai para agendamento
+        continue;
       }
       reply = turn.reply ?? '';
       break;
@@ -136,139 +109,82 @@ export async function handleMessage(
 
     if (stage === 'agendamento') {
       const turn = await runSchedulingTurn(history, {
-        professionalId: prof.id,
-        professionalName: prof.display_name,
-        timezone: prof.timezone,
-        services: (services ?? []) as Service[],
+        professionalName: profile.professional.display_name,
+        timezone: profile.professional.timezone,
+        services: profile.services,
       });
       if (turn.done) {
-        reply = await persistAppointment(conv, prof, turn.done);
-        await db
-          .from('conversation')
-          .update({ stage: 'concluido' })
-          .eq('id', conv.id);
+        reply = await finalizeAppointment(profile, conv, turn.done);
         stage = 'concluido';
         break;
       }
       reply = turn.reply ?? '';
       break;
     }
-
-    break; // concluido / abandonado
+    break;
   }
 
-  // 4. Persiste histórico atualizado.
   history.push({ role: 'assistant', content: reply });
-  await db
-    .from('conversation')
-    .update({ messages: history, last_activity_at: new Date().toISOString() })
-    .eq('id', conv.id);
-
+  await store.updateConversation(conv.id, { stage, intent, messages: history });
   return { reply, stage, done: stage === 'concluido' };
 }
 
-// --- Persistência auxiliar -------------------------------------------------
-
-async function persistTriage(conversationId: string, r: TriageResult) {
-  const db = supabaseAdmin();
-  const rows = r.respostas.map((a) => ({
-    conversation_id: conversationId,
-    question_key: a.chave,
-    question_label: a.pergunta,
-    answer: a.resposta,
-  }));
-  if (rows.length) await db.from('triage_answer').upsert(rows);
+function summary(r: TriageResult): string {
+  const linhas = r.respostas.map((a) => `- ${a.label} ${a.answer}`);
+  return `Intenção: ${r.intent}${r.urgente ? ' (URGENTE)' : ''}\n${r.resumo}\n${linhas.join('\n')}`;
 }
 
-async function persistLead(
-  conv: Conversation,
-  lead: LeadResult,
-  reason: string,
-) {
-  const db = supabaseAdmin();
-  await db.from('lead').upsert(
-    {
-      professional_id: conv.professional_id,
-      conversation_id: conv.id,
-      full_name: lead.full_name,
-      whatsapp: lead.whatsapp,
-      email: lead.email ?? null,
-      reason: lead.reason ?? reason,
-      urgency: lead.urgency,
-      recurrence: lead.recurrence,
-      status: conv.intent === 'agendar' ? 'em_contato' : 'novo',
-    },
-    { onConflict: 'conversation_id' },
-  );
+function lastTag(history: ChatMessage[]): string {
+  const found = [...history].reverse().find((m) => m.content.startsWith(TRIAGE_TAG));
+  return found?.content.replace(`${TRIAGE_TAG} `, '') ?? '';
 }
 
-async function persistAppointment(
+async function finalizeAppointment(
+  profile: PublicProfile,
   conv: Conversation,
-  prof: Professional,
-  sched: ScheduleResult,
+  appt: { service_id: string; starts_at: string; ends_at: string; modality: 'online' | 'presencial' },
 ): Promise<string> {
-  const db = supabaseAdmin();
-  const event = await createEvent(prof.id, {
-    startsAt: sched.starts_at,
-    endsAt: sched.ends_at,
-    label: '',
-  }, `Atendimento — ${prof.display_name}`);
+  const event = await createEvent(
+    { startsAt: appt.starts_at, endsAt: appt.ends_at, label: '' },
+    `Consulta — ${profile.professional.display_name}`,
+  );
+  const created = await store.createAppointment(profile.professional.id, conv.id, {
+    ...appt,
+    gcal_event_id: event.gcalEventId,
+    meeting_url: event.meetingUrl,
+  });
 
-  const { data: lead } = await db
-    .from('lead')
-    .select('id, whatsapp, full_name')
-    .eq('conversation_id', conv.id)
-    .maybeSingle();
-
-  const { data: appt } = await db
-    .from('appointment')
-    .insert({
-      professional_id: prof.id,
-      lead_id: lead?.id ?? null,
-      conversation_id: conv.id,
-      service_id: sched.service_id,
-      starts_at: sched.starts_at,
-      ends_at: sched.ends_at,
-      modality: sched.modality,
-      gcal_event_id: event.gcalEventId,
-      meeting_url: event.meetingUrl ?? null,
-    })
-    .select('id')
-    .single();
-
-  // Enfileira o lembrete: 24h antes da consulta.
-  if (lead?.whatsapp && appt) {
-    const remindAt = new Date(
-      new Date(sched.starts_at).getTime() - 24 * 3600_000,
-    );
-    await db.from('notification').insert({
-      professional_id: prof.id,
-      lead_id: lead.id,
-      appointment_id: appt.id,
-      conversation_id: conv.id,
-      kind: 'lembrete_consulta',
-      channel: 'whatsapp',
-      to_address: lead.whatsapp,
-      body: '', // gerado pelo agente de follow-up no momento do envio
-      scheduled_for: remindAt.toISOString(),
-    });
-    // Atualiza status do lead.
-    await db.from('lead').update({ status: 'agendado' }).eq('id', lead.id);
-  }
-
-  const when = new Date(sched.starts_at).toLocaleString('pt-BR', {
-    timeZone: prof.timezone,
+  const when = new Date(appt.starts_at).toLocaleString('pt-BR', {
+    timeZone: profile.professional.timezone,
     weekday: 'long',
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
   });
-  return `Agendamento confirmado para ${when}. Você vai receber um lembrete no WhatsApp antes. Até lá! 💛`;
-}
 
-function lastTriageSummary(history: ChatMessage[]): string {
-  const found = [...history]
-    .reverse()
-    .find((m) => m.content.startsWith('[triagem concluída]'));
-  return found?.content.replace('[triagem concluída] ', '') ?? '';
+  // Enfileira confirmação (imediata) + lembrete (24h antes) por e-mail.
+  // Endereço do lead: recuperado no envio pelo cron (aqui usamos reply_to como fallback demo).
+  const to = profile.professional.reply_to_email ?? '';
+  if (to) {
+    await store.enqueueNotification({
+      professionalId: profile.professional.id,
+      conversationId: conv.id,
+      appointmentId: created.id,
+      kind: 'confirmacao',
+      to,
+      subject: `Consulta confirmada — ${profile.professional.display_name}`,
+      body: `Consulta confirmada para ${when}.`,
+      scheduledFor: new Date().toISOString(),
+    });
+    await store.enqueueNotification({
+      professionalId: profile.professional.id,
+      conversationId: conv.id,
+      appointmentId: created.id,
+      kind: 'lembrete_consulta',
+      to,
+      scheduledFor: new Date(Date.parse(appt.starts_at) - 24 * 3600_000).toISOString(),
+    });
+  }
+
+  return `Agendamento confirmado para ${when}. A confirmação e o lembrete chegam por e-mail. Até lá! 💛`;
 }

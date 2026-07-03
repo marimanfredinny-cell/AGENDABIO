@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 export const metadata: Metadata = {
   title: 'AgendaBio',
-  description: 'Link na bio conversacional com agendamento inteligente.',
+  description: 'O link na bio que conversa, qualifica e agenda — para a saúde.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -12,9 +12,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body
         style={{
           margin: 0,
-          fontFamily: 'system-ui, sans-serif',
-          background: '#f6f5f2',
-          color: '#1b1b1b',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          background: '#f3f6f4',
+          color: '#16241d',
         }}
       >
         {children}
