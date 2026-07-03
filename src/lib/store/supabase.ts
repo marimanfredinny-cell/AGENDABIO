@@ -63,6 +63,56 @@ export const supabaseStore: Store = {
     return buildProfile(db, professional);
   },
 
+  async getGoogleIntegration(professionalId) {
+    const db = admin();
+    const { data } = await db
+      .from('professional_integration')
+      .select('access_token, refresh_token, expires_at, config')
+      .eq('professional_id', professionalId)
+      .eq('provider', 'google_calendar')
+      .maybeSingle();
+    if (!data) return null;
+    return {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: data.expires_at,
+      calendar_id: (data.config?.calendar_id as string) ?? 'primary',
+    };
+  },
+
+  async saveGoogleTokens(professionalId, tokens) {
+    const db = admin();
+    // Preserva refresh_token/config existentes quando o refresh só devolve access_token.
+    const { data: existing } = await db
+      .from('professional_integration')
+      .select('refresh_token, config')
+      .eq('professional_id', professionalId)
+      .eq('provider', 'google_calendar')
+      .maybeSingle();
+
+    await db.from('professional_integration').upsert(
+      {
+        professional_id: professionalId,
+        provider: 'google_calendar',
+        access_token: tokens.access_token ?? null,
+        refresh_token: tokens.refresh_token ?? existing?.refresh_token ?? null,
+        expires_at: tokens.expires_at ?? null,
+        config: { calendar_id: tokens.calendar_id ?? existing?.config?.calendar_id ?? 'primary' },
+      },
+      { onConflict: 'professional_id,provider' },
+    );
+  },
+
+  async getLeadEmail(conversationId) {
+    const db = admin();
+    const { data } = await db
+      .from('lead')
+      .select('email')
+      .eq('conversation_id', conversationId)
+      .maybeSingle();
+    return data?.email ?? null;
+  },
+
   async createConversation(professionalId, greeting) {
     const db = admin();
     const { data } = await db

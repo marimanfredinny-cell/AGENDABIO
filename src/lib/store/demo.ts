@@ -103,6 +103,16 @@ export const demoStore: Store = {
   async getPublicProfileById(id) {
     return profiles.find((p) => p.professional.id === id) ?? null;
   },
+  async getGoogleIntegration() {
+    // Modo demo não tem Google conectado -> slots simulados.
+    return null;
+  },
+  async saveGoogleTokens() {
+    /* no-op no demo */
+  },
+  async getLeadEmail() {
+    return null;
+  },
   async createConversation(professionalId, greeting) {
     const conv: Conversation = {
       id: randomUUID(),

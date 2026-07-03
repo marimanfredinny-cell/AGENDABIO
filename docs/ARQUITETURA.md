@@ -88,8 +88,12 @@ template. Exemplos de templates (formato para adicionar as demais) estão no see
 
 ## 4. Integrações (estado no protótipo)
 
-- **Google Calendar** (`src/lib/google/calendar.ts`): slots simulados; trocar por
-  `freebusy.query` + `events.insert`.
+- **Google Calendar** (`src/lib/google/calendar.ts`): integração real. OAuth em
+  `/api/google/connect` + `/api/google/callback` (tokens em
+  `professional_integration`); disponibilidade via `freebusy.query` (dias úteis,
+  9h–18h, no fuso do profissional) e criação de evento com Google Meet via
+  `events.insert`, com refresh automático de token. Sem profissional conectado,
+  cai para slots simulados.
 - **Resend** (`src/lib/email/resend.ts`): envia se `RESEND_API_KEY` existir, senão
   loga (modo protótipo).
 - **Cron** (`/api/cron/reminders`): agende GET periódico com `x-cron-secret`.

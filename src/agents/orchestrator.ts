@@ -109,6 +109,7 @@ export async function handleMessage(
 
     if (stage === 'agendamento') {
       const turn = await runSchedulingTurn(history, {
+        professionalId: profile.professional.id,
         professionalName: profile.professional.display_name,
         timezone: profile.professional.timezone,
         services: profile.services,
@@ -144,10 +145,15 @@ async function finalizeAppointment(
   conv: Conversation,
   appt: { service_id: string; starts_at: string; ends_at: string; modality: 'online' | 'presencial' },
 ): Promise<string> {
-  const event = await createEvent(
-    { startsAt: appt.starts_at, endsAt: appt.ends_at, label: '' },
-    `Consulta — ${profile.professional.display_name}`,
-  );
+  const attendeeEmail = await store.getLeadEmail(conv.id);
+  const event = await createEvent({
+    professionalId: profile.professional.id,
+    timezone: profile.professional.timezone,
+    slot: { startsAt: appt.starts_at, endsAt: appt.ends_at, label: '' },
+    summary: `Consulta — ${profile.professional.display_name}`,
+    attendeeEmail,
+    modality: appt.modality,
+  });
   const created = await store.createAppointment(profile.professional.id, conv.id, {
     ...appt,
     gcal_event_id: event.gcalEventId,
@@ -163,8 +169,7 @@ async function finalizeAppointment(
   });
 
   // Enfileira confirmação (imediata) + lembrete (24h antes) por e-mail.
-  // Endereço do lead: recuperado no envio pelo cron (aqui usamos reply_to como fallback demo).
-  const to = profile.professional.reply_to_email ?? '';
+  const to = attendeeEmail ?? profile.professional.reply_to_email ?? '';
   if (to) {
     await store.enqueueNotification({
       professionalId: profile.professional.id,

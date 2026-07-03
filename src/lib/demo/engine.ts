@@ -120,7 +120,11 @@ export async function demoStep(
       recurrence: 'primeira_vez',
     });
 
-    const slots = await getAvailability(profile.services[0]?.duration_minutes ?? 50);
+    const slots = await getAvailability({
+      professionalId: profile.professional.id,
+      timezone: profile.professional.timezone,
+      durationMinutes: profile.services[0]?.duration_minutes ?? 50,
+    });
     prog.slots = slots;
     state.set(conv.id, prog);
     const lista = slots.map((s, i) => `${i + 1}) ${s.label}`).join('\n');
@@ -133,7 +137,13 @@ export async function demoStep(
 
   // ---- AGENDAMENTO ---------------------------------------------------------
   if (conv.stage === 'agendamento') {
-    const slots = prog.slots ?? (await getAvailability());
+    const slots =
+      prog.slots ??
+      (await getAvailability({
+        professionalId: profile.professional.id,
+        timezone: profile.professional.timezone,
+        durationMinutes: profile.services[0]?.duration_minutes ?? 50,
+      }));
     const n = parseInt(userMessage.trim(), 10);
     const chosen = !Number.isNaN(n) && slots[n - 1] ? slots[n - 1] : slots[0];
 

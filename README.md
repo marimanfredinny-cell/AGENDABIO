@@ -45,6 +45,19 @@ Para ativar o **modo real**, preencha `.env.local` (veja `.env.example`):
 - `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` → liga o banco (rode
   `supabase/migrations/0001_init.sql` e `0002_seed.sql` no SQL editor).
 - `RESEND_API_KEY` → envia e-mails de verdade.
+- `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` + `GOOGLE_REDIRECT_URI` → Google
+  Calendar real.
+
+### Conectar o Google Calendar de um profissional
+
+Com as variáveis do Google preenchidas e o Supabase ativo:
+
+1. Acesse `‎/api/google/connect?professionalId=<id do profissional>` e autorize.
+2. O callback salva os tokens em `professional_integration` (com `refresh_token`).
+3. A partir daí, a disponibilidade vem do **freebusy** da agenda e cada
+   agendamento cria um **evento com Google Meet** (`events.insert`); o token é
+   renovado automaticamente. Sem profissional conectado, o sistema usa horários
+   simulados (dias úteis, 9h–18h) — por isso o modo demo continua funcionando.
 
 ## Estrutura
 
@@ -67,6 +80,5 @@ supabase/migrations/  # 0001 esquema · 0002 seed (especialidades + templates)
 ## Próximos passos
 
 - Onboarding real (Supabase Auth: compra → conta → cadastro de especialidade).
-- OAuth + chamadas reais do Google Calendar.
-- Painel do profissional (leads, agenda, conversas).
+- Painel do profissional (leads, agenda, conversas) + botão "conectar Google".
 - Streaming das respostas do chat.

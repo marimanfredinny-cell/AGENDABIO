@@ -88,9 +88,23 @@ export interface AppointmentInput {
   modality: 'online' | 'presencial';
 }
 
+export interface GoogleIntegration {
+  access_token: string | null;
+  refresh_token: string | null;
+  expires_at: string | null; // ISO
+  calendar_id: string;
+}
+
 export interface Store {
   getPublicProfileBySlug(slug: string): Promise<PublicProfile | null>;
   getPublicProfileById(professionalId: string): Promise<PublicProfile | null>;
+  // Google Calendar (professional_integration provider='google_calendar')
+  getGoogleIntegration(professionalId: string): Promise<GoogleIntegration | null>;
+  saveGoogleTokens(
+    professionalId: string,
+    tokens: { access_token?: string | null; refresh_token?: string | null; expires_at?: string | null; calendar_id?: string },
+  ): Promise<void>;
+  getLeadEmail(conversationId: string): Promise<string | null>;
   createConversation(professionalId: string, greeting: string): Promise<Conversation>;
   getConversation(id: string): Promise<Conversation | null>;
   updateConversation(

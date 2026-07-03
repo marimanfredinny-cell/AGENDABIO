@@ -58,7 +58,7 @@ export interface ScheduleTurn {
 
 export async function runSchedulingTurn(
   history: ChatMessage[],
-  ctx: { professionalName: string; timezone: string; services: Service[] },
+  ctx: { professionalId: string; professionalName: string; timezone: string; services: Service[] },
 ): Promise<ScheduleTurn> {
   const system = systemPrompt(ctx.professionalName, ctx.timezone, ctx.services);
   const msgs: Anthropic.MessageParam[] = history.map((m) => ({
@@ -88,7 +88,11 @@ export async function runSchedulingTurn(
     // consultar_disponibilidade -> resolve e devolve ao modelo
     const input = toolUse.input as { service_id: string };
     const service = ctx.services.find((s) => s.id === input.service_id);
-    const slots: Slot[] = await getAvailability(service?.duration_minutes ?? 50);
+    const slots: Slot[] = await getAvailability({
+      professionalId: ctx.professionalId,
+      timezone: ctx.timezone,
+      durationMinutes: service?.duration_minutes ?? 50,
+    });
     msgs.push({ role: 'assistant', content: response.content });
     msgs.push({
       role: 'user',
