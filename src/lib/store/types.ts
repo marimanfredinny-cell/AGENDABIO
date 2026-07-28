@@ -126,6 +126,8 @@ export interface NewProfessional {
   phone?: string;
   plan?: string;
   billing?: 'mensal' | 'anual';
+  auth_user_id?: string | null;
+  active?: boolean; // false = pendente (aguardando pagamento)
 }
 
 export interface Store {
@@ -133,6 +135,10 @@ export interface Store {
   getPublicProfileById(professionalId: string): Promise<PublicProfile | null>;
   listSpecialties(): Promise<Specialty[]>;
   createProfessional(input: NewProfessional): Promise<{ slug: string }>;
+  activateProfessional(slug: string): Promise<void>;
+  // Auth
+  getProfessionalByAuthId(authUserId: string): Promise<PublicProfile | null>;
+  createAuthUser(email: string, password: string): Promise<string | null>;
   // Painel do profissional
   listLeads(professionalId: string): Promise<LeadRecord[]>;
   listAppointments(professionalId: string): Promise<AppointmentRecord[]>;

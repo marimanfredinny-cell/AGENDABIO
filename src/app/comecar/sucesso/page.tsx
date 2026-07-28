@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { stripe, USE_STRIPE } from '@/lib/stripe';
+import { store } from '@/lib/store';
 
 // Página de sucesso = confirmação instantânea.
 // Com Stripe: confere payment_status na hora (não espera webhook).
@@ -19,6 +20,11 @@ export default async function SucessoPage({
     } catch {
       paid = false;
     }
+  }
+
+  // Ativa a conta na hora quando o pagamento confirma (não espera o webhook).
+  if (paid && slug) {
+    await store.activateProfessional(slug);
   }
 
   return (
@@ -69,6 +75,20 @@ export default async function SucessoPage({
                 }}
               >
                 Ver minha página →
+              </Link>
+              <Link
+                href={`/painel/${slug}`}
+                style={{
+                  display: 'block',
+                  padding: '0.8rem',
+                  borderRadius: 14,
+                  border: '1px solid #ddd',
+                  color: '#111',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                Ir para o painel
               </Link>
               <Link
                 href={`/painel/${slug}`}

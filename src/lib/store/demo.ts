@@ -245,6 +245,16 @@ export const demoStore: Store = {
     demo.appointments.push(rec);
     return { id: rec.id };
   },
+  async activateProfessional() {
+    /* no-op no demo (já nasce ativo) */
+  },
+  async getProfessionalByAuthId() {
+    // Sem Supabase Auth no demo.
+    return null;
+  },
+  async createAuthUser() {
+    return null;
+  },
   async listLeads(professionalId) {
     return demo.leads
       .filter((l) => l.professional_id === professionalId)

@@ -63,6 +63,34 @@ export const supabaseStore: Store = {
     return buildProfile(db, professional);
   },
 
+  async getProfessionalByAuthId(authUserId) {
+    const db = admin();
+    const { data: professional } = await db
+      .from('professional')
+      .select('*')
+      .eq('auth_user_id', authUserId)
+      .maybeSingle();
+    if (!professional) return null;
+    return buildProfile(db, professional);
+  },
+
+  async createAuthUser(email, password) {
+    const db = admin();
+    // Cria o usuário já confirmado (acesso instantâneo). Requer service role.
+    const { data, error } = await db.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+    if (error) throw new Error(error.message);
+    return data.user?.id ?? null;
+  },
+
+  async activateProfessional(slug) {
+    const db = admin();
+    await db.from('professional').update({ is_active: true }).eq('slug', slug);
+  },
+
   async listSpecialties() {
     const db = admin();
     const { data } = await db
@@ -101,6 +129,8 @@ export const supabaseStore: Store = {
         specialty_id: spec.id,
         registration_number: input.registration_number ?? null,
         reply_to_email: input.email ?? null,
+        auth_user_id: input.auth_user_id ?? null,
+        is_active: input.active ?? true,
       })
       .select('id, slug')
       .single();

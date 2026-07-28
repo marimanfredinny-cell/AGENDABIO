@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { PLANS, annualPrice } from '@/lib/plans';
 import { stripe, USE_STRIPE, appUrl } from '@/lib/stripe';
+import { USE_SUPABASE } from '@/lib/config';
 
 export const runtime = 'nodejs';
 
@@ -18,6 +19,7 @@ export async function POST(req: NextRequest) {
       billing,
       display_name,
       email,
+      password,
       whatsapp,
       specialty_slug,
       registration_number,
@@ -26,6 +28,7 @@ export async function POST(req: NextRequest) {
       billing: 'mensal' | 'anual';
       display_name: string;
       email: string;
+      password?: string;
       whatsapp?: string;
       specialty_slug: string;
       registration_number?: string;
@@ -36,7 +39,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Dados incompletos' }, { status: 400 });
     }
 
-    // Cria o profissional (gera slug + monta a página a partir da especialidade).
+    // Cria o usuário de acesso (Supabase Auth) quando configurado.
+    let authUserId: string | null = null;
+    if (USE_SUPABASE) {
+      if (!password || password.length < 8) {
+        return NextResponse.json({ error: 'Senha deve ter ao menos 8 caracteres.' }, { status: 400 });
+      }
+      try {
+        authUserId = await store.createAuthUser(email, password);
+      } catch (e) {
+        return NextResponse.json({ error: `Não foi possível criar a conta: ${e}` }, { status: 400 });
+      }
+    }
+
+    // Com Stripe, o profissional nasce pendente e é ativado após o pagamento.
+    // Sem Stripe (stub), já nasce ativo.
     const { slug } = await store.createProfessional({
       display_name,
       specialty_slug,
@@ -45,6 +62,8 @@ export async function POST(req: NextRequest) {
       phone: whatsapp,
       plan: plan.id,
       billing,
+      auth_user_id: authUserId,
+      active: !USE_STRIPE,
     });
 
     // ---- Modo stub (sem Stripe): confirmação instantânea ----
