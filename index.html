@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radar Londres e Zurique</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: cabeçalho, resumo, duas listas de cartões (uma coluna no celular, duas no desktop). */
+:root {
+  --bg: #f4f6f7;
+  --surface: #ffffff;
+  --ink: #17262b;
+  --muted: #5b6b71;
+  --line: #d9e0e3;
+  --accent: #0f6b73;
+  --accent-soft: #dff0f1;
+  --font-display: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1a1d; --surface: #172428; --ink: #e6eef0; --muted: #93a6ab;
+    --line: #2a3b40; --accent: #5fc2c9; --accent-soft: #1b3438; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1a1d; --surface: #172428; --ink: #e6eef0; --muted: #93a6ab;
+  --line: #2a3b40; --accent: #5fc2c9; --accent-soft: #1b3438; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.5; }
+a { color: var(--accent); }
+a:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; display: flex; flex-direction: column; gap: 32px; }
+header h1 { font-family: var(--font-display); font-size: clamp(1.6rem, 5vw, 2.2rem); line-height: 1.15; margin: 0 0 8px; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); max-width: 65ch; }
+nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+nav a { text-decoration: none; background: var(--accent-soft); color: var(--accent); font-weight: 600; padding: 8px 14px; border-radius: 999px; font-size: 0.9rem; }
+h2 { font-family: var(--font-display); font-size: 1.4rem; margin: 0 0 6px; text-wrap: balance; }
+.intro { margin: 0 0 16px; color: var(--muted); max-width: 65ch; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: grid; gap: 16px; }
+.panel h3 { margin: 0 0 4px; font-size: 1rem; }
+.panel p, .panel li { margin: 0; color: var(--muted); max-width: 65ch; }
+.panel ul, .panel ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.cols { display: grid; gap: 20px; grid-template-columns: 1fr; }
+@media (min-width: 760px) { .cols { grid-template-columns: 1fr 1fr; } }
+.grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; gap: 14px; }
+.rank { flex: none; width: 34px; height: 34px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); font-family: var(--font-num); display: grid; place-items: center; font-size: 0.95rem; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+.site { font-weight: 600; font-size: 1.1rem; overflow-wrap: anywhere; }
+.site.nolink { color: var(--ink); }
+.visits { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+.visits .num { font-family: var(--font-num); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.visits .unit { font-size: 0.75rem; color: var(--muted); }
+.visits .when { margin-top: 4px; font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.visits .when.old { background: #f6e3c4; color: #7a4a00; }
+:root[data-theme="dark"] .visits .when.old { background: #4a3a1c; color: #f0cf94; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .visits .when.old { background: #4a3a1c; color: #f0cf94; } }
+.visits.none .num { color: var(--muted); font-family: var(--font-body); font-size: 0.95rem; }
+.tipo { font-size: 0.9rem; color: var(--muted); }
+.url { font-size: 0.82rem; overflow-wrap: anywhere; }
+.muted { color: var(--muted); }
+.fonte { margin: 4px 0 0; font-size: 0.88rem; color: var(--muted); max-width: 65ch; }
+.crm { margin-top: 8px; padding-top: 12px; border-top: 1px dashed var(--line); display: grid; gap: 6px; }
+.crm label { font-size: 0.78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+select, textarea { width: 100%; font: inherit; font-size: 0.95rem; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+textarea { resize: vertical; min-height: 72px; }
+.tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button { font: inherit; font-weight: 600; font-size: 0.9rem; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: var(--bg); cursor: pointer; }
+button.ghost { background: transparent; color: var(--accent); }
+.msg { font-size: 0.85rem; color: var(--muted); }
+footer { color: var(--muted); font-size: 0.85rem; max-width: 65ch; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Radar de sites: Londres e Zurique</h1>
+  <p>Levantamento dos sites do segmento de escorts que mais aparecem no Google e têm mais visitas, com link clicável, status e espaço para suas notas. Uso próprio.</p>
+  <nav aria-label="Seções">
+    <a href="#resumo">Resumo</a>
+    <a href="#londres">Londres (12 sites)</a>
+    <a href="#zurique">Zurique (11 sites)</a>
+    <a href="#refazer">Como refazer</a>
+  </nav>
+</header>
+
+<section id="resumo">
+  <h2>Resumo</h2>
+  <div class="panel">
+    <div class="cols">
+      <div>
+        <h3>O que foi feito</h3>
+        <p>Busca nas páginas públicas do Semrush e do Ahrefs por sites que ranqueiam para escort em Londres (Reino Unido) e em Zurique (Suíça), mais os diretórios onde as agências aparecem. A lista é ordenada pelo número de visitas mensais estimadas.</p>
+      </div>
+      <div>
+        <h3>O que os números significam</h3>
+        <ul>
+          <li>São estimativas de ferramentas e meses diferentes (a etiqueta de cada site mostra o mês). Servem como ordem de grandeza, não como ranking exato.</li>
+          <li>Novembro de 2026 ainda não existe nas ferramentas. O mais recente é setembro e outubro de 2026.</li>
+          <li>Nenhuma ferramenta separa por cidade. Londres usa dados do Reino Unido e Zurique usa dados da Suíça.</li>
+          <li>Classificados gerais (vivastreet, locanto, petitesannonces, inserate) têm tráfego inflado por outros assuntos.</li>
+          <li>Zurique tem bem menos dados públicos que Londres.</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <h3>Anúncios</h3>
+      <p>Google Ads e Meta Ads restringem esse tipo de anúncio. Por isso, a maior parte do tráfego desses sites vem de SEO e de diretórios.</p>
+    </div>
+  </div>
+</section>
+
+
+<section id="londres">
+  <h2>Londres (Reino Unido)</h2>
+  <p class="intro">Dados do Reino Unido, porque as ferramentas não separam por cidade. 12 sites, 8 com número de visitas. Do mais visitado para o menos.</p>
+  <div class="grid">
+<article class="card" data-key="londres-1">
+  <div class="rank">1</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://www.vivastreet.co.uk" target="_blank" rel="noopener">vivastreet.co.uk</a><div class="visits"><span class="num">4.400.000</span><span class="unit">visitas/mês (est.)</span><span class="when">Out/2026</span></div></div>
+    <div class="tipo">Classificados gerais (seção adulta)</div>
+    <a class="url" href="https://www.vivastreet.co.uk" target="_blank" rel="noopener">https://www.vivastreet.co.uk</a>
+    <p class="fonte">Ahrefs: cerca de 4,5 mi de visitas orgânicas/mês, 96,9% do Reino Unido (4,4 mi). Boa parte vem de quem busca pelo nome da marca. Não é só escort.</p>
+    <div class="crm">
+      <label for="st-londres-1">Status</label>
+      <select id="st-londres-1" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-londres-1">Notas e observações</label>
+      <textarea id="nt-londres-1" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="londres-2">
+  <div class="rank">2</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://escortrankings.uk" target="_blank" rel="noopener">escortrankings.uk</a><div class="visits"><span class="num">306.500</span><span class="unit">visitas/mês (est.)</span><span class="when">Set/2026</span></div></div>
+    <div class="tipo">Diretório / ranking de escorts</div>
+    <a class="url" href="https://escortrankings.uk" target="_blank" rel="noopener">https://escortrankings.uk</a>
+    <p class="fonte">Semrush: cerca de 306,5 mil visitas totais. A página não informa o recorte do Reino Unido (em out/2025 era 68,7%).</p>
+    <div class="crm">
+      <label for="st-londres-2">Status</label>
+      <select id="st-londres-2" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-londres-2">Notas e observações</label>
+      <textarea id="nt-londres-2" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="londres-3">
+  <div class="rank">3</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://www.locanto.co.uk" target="_blank" rel="noopener">locanto.co.uk</a><div class="visits"><span class="num">269.400</span><span class="unit">visitas/mês (est.)</span><span class="when">Out/2026</span></div></div>
+    <div class="tipo">Classificados gerais (seção adulta)</div>
+    <a class="url" href="https://www.locanto.co.uk" target="_blank" rel="noopener">https://www.locanto.co.uk</a>
+    <p class="fonte">Ahrefs: cerca de 276 mil visitas orgânicas/mês, 97,5% do Reino Unido (269 mil). Não é só escort.</p>
+    <div class="crm">
+      <label for="st-londres-3">Status</label>
+      <select id="st-londres-3" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-londres-3">Notas e observações</label>
+      <textarea id="nt-londres-3" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="londres-4">
+  <div class="rank">4</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://escortfinderuk.co.uk" target="_blank" rel="noopener">escortfinderuk.co.uk</a><div class="visits"><span class="num">95.700</span><span class="unit">visitas/mês (est.)</span><span class="when old">Nov/2025 (antigo)</span></div></div>
+    <div class="tipo">Diretório de escorts</div>
+    <a class="url" href="https://escortfinderuk.co.uk" target="_blank" rel="noopener">https://escortfinderuk.co.uk</a>
+    <p class="fonte">Semrush: cerca de 95,7 mil visitas/mês do Reino Unido. Não consegui dado mais novo desta página.</p>
+    <div class="crm">
+      <label for="st-londres-4">Status</label>
+      <select id="st-londres-4" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-londres-4">Notas e observações</label>
+      <textarea id="nt-londres-4" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="londres-5">
+  <div class="rank">5</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://londonts.com" target="_blank" rel="noopener">londonts.com</a><div class="visits"><span class="num">73.300</span><span class="unit">visitas/mês (est.)</span><span class="when">Out/2026</span></div></div>
+    <div class="tipo">Diretório de nicho (trans)</div>
+    <a class="url" href="https://londonts.com" target="_blank" rel="noopener">https://londonts.com</a>
+    <p class="fonte">Semrush: cerca de 73,3 mil visitas/mês do Reino Unido (51,1%), de 143,6 mil no total.</p>
+    <div class="crm">
+      <label for="st-londres-5">Status</label>
+      <select id="st-londres-5" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-londres-5">Notas e observações</label>
+      <textarea id="nt-londres-5" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="londres-6">
+  <div class="rank">6</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://shemale.uk" target="_blank" rel="noopener">shemale.uk</a><div class="visits"><span class="num">59.280</span><span class="unit">visitas/mês (est.)</span><span class="when old">Nov/2025 (antigo)</span></div></div>
+    <div class="tipo">Diretório de nicho (trans)</div>
+    <a class="url" href="https://shemale.uk" target="_blank" rel="noopener">https://shemale.uk</a>
+    <p class="fonte">Semrush: cerca de 59 mil visitas/mês do Reino Unido, 40,7% do tráfego total. Não consegui dado mais novo desta página.</p>
+    <div class="crm">
+      <label for="st-londres-6">Status</label>
+      <select id="st-londres-6" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-londres-6">Notas e observações</label>
+      <textarea id="nt-londres-6" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="londres-7">
+  <div class="rank">7</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://scoot.co.uk" target="_blank" rel="noopener">scoot.co.uk</a><div class="visits"><span class="num">20.200</span><span class="unit">visitas/mês (est.)</span><span class="when">Out/2026</span></div></div>
+    <div class="tipo">Diretório local (escort e massagem)</div>
+    <a class="url" href="https://scoot.co.uk" target="_blank" rel="noopener">https://scoot.co.uk</a>
+    <p class="fonte">Ahrefs: cerca de 20,4 mil visitas orgânicas/mês, 98,8% do Reino Unido (20,2 mil).</p>
+    <div class="crm">
+      <label for="st-londres-7">Status</label>
+      <select id="st-londres-7" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-londres-7">Notas e observações</label>
+      <textarea id="nt-londres-7" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="londres-8">
+  <div class="rank">8</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://escortlia.com" target="_blank" rel="noopener">escortlia.com</a><div class="visits"><span class="num">6.400</span><span class="unit">visitas/mês (est.)</span><span class="when">Out/2026</span></div></div>
+    <div class="tipo">Diretório de escorts</div>
+    <a class="url" href="https://escortlia.com" target="_blank" rel="noopener">https://escortlia.com</a>
+    <p class="fonte">Ahrefs: cerca de 6,4 mil visitas orgânicas/mês vêm do Reino Unido. O site é voltado sobretudo à Turquia (99,9% do tráfego), então tem pouca relevância para Londres.</p>
+    <div class="crm">
+      <label for="st-londres-8">Status</label>
+      <select id="st-londres-8" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-londres-8">Notas e observações</label>
+      <textarea id="nt-londres-8" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="londres-9">
+  <div class="rank">9</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://erobella.com" target="_blank" rel="noopener">erobella.com</a><div class="visits none"><span class="num">sem dado</span><span class="unit">de visitas</span></div></div>
+    <div class="tipo">Diretório de escorts</div>
+    <a class="url" href="https://erobella.com" target="_blank" rel="noopener">https://erobella.com</a>
+    <p class="fonte">Sem dado de visitas. Aparece entre os sites visitados pelo público do escortrankings.uk e como concorrente do scoot.co.uk.</p>
+    <div class="crm">
+      <label for="st-londres-9">Status</label>
+      <select id="st-londres-9" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-londres-9">Notas e observações</label>
+      <textarea id="nt-londres-9" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="londres-10">
+  <div class="rank">10</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://www.adultwork.com" target="_blank" rel="noopener">adultwork.com</a><div class="visits none"><span class="num">sem dado</span><span class="unit">de visitas</span></div></div>
+    <div class="tipo">Diretório de escorts</div>
+    <a class="url" href="https://www.adultwork.com" target="_blank" rel="noopener">https://www.adultwork.com</a>
+    <p class="fonte">Sem dado de visitas. Aparece entre os sites visitados pelo público do escortrankings.uk.</p>
+    <div class="crm">
+      <label for="st-londres-10">Status</label>
+      <select id="st-londres-10" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-londres-10">Notas e observações</label>
+      <textarea id="nt-londres-10" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="londres-11">
+  <div class="rank">11</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://simpleescorts.com" target="_blank" rel="noopener">simpleescorts.com</a><div class="visits none"><span class="num">sem dado</span><span class="unit">de visitas</span></div></div>
+    <div class="tipo">Diretório de escorts</div>
+    <a class="url" href="https://simpleescorts.com" target="_blank" rel="noopener">https://simpleescorts.com</a>
+    <p class="fonte">Sem dado de visitas. Aparece como concorrente do scoot.co.uk no Ahrefs.</p>
+    <div class="crm">
+      <label for="st-londres-11">Status</label>
+      <select id="st-londres-11" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-londres-11">Notas e observações</label>
+      <textarea id="nt-londres-11" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="londres-12">
+  <div class="rank">12</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://ukadultzone.com" target="_blank" rel="noopener">ukadultzone.com</a><div class="visits none"><span class="num">sem dado</span><span class="unit">de visitas</span></div></div>
+    <div class="tipo">Diretório de escorts</div>
+    <a class="url" href="https://ukadultzone.com" target="_blank" rel="noopener">https://ukadultzone.com</a>
+    <p class="fonte">Sem dado de visitas. Aparece como concorrente do scoot.co.uk no Ahrefs.</p>
+    <div class="crm">
+      <label for="st-londres-12">Status</label>
+      <select id="st-londres-12" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-londres-12">Notas e observações</label>
+      <textarea id="nt-londres-12" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article></div>
+</section>
+
+
+<section id="zurique">
+  <h2>Zurique (Suíça)</h2>
+  <p class="intro">Dados da Suíça, porque as ferramentas não separam por cidade. 11 sites, 5 com número de visitas. Do mais visitado para o menos.</p>
+  <div class="grid">
+<article class="card" data-key="zurique-1">
+  <div class="rank">1</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://fgirl.ch" target="_blank" rel="noopener">fgirl.ch</a><div class="visits"><span class="num">1.356.700</span><span class="unit">visitas/mês (est.)</span><span class="when">Set/2026</span></div></div>
+    <div class="tipo">Diretório de escorts (Suíça francófona)</div>
+    <a class="url" href="https://fgirl.ch" target="_blank" rel="noopener">https://fgirl.ch</a>
+    <p class="fonte">Semrush: cerca de 1,89 mi de visitas totais, 71,9% da Suíça (1,36 mi). Muito tráfego pelo nome da marca. Ranqueia para busca de escort em Genebra e Lausanne.</p>
+    <div class="crm">
+      <label for="st-zurique-1">Status</label>
+      <select id="st-zurique-1" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-zurique-1">Notas e observações</label>
+      <textarea id="nt-zurique-1" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="zurique-2">
+  <div class="rank">2</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://inserate.gratis" target="_blank" rel="noopener">inserate.gratis</a><div class="visits"><span class="num">331.870</span><span class="unit">visitas/mês (est.)</span><span class="when">Out/2026</span></div></div>
+    <div class="tipo">Classificados gerais (alemão)</div>
+    <a class="url" href="https://inserate.gratis" target="_blank" rel="noopener">https://inserate.gratis</a>
+    <p class="fonte">Semrush: cerca de 332 mil visitas totais. Em dez/2025 o público principal era a Suíça, depois a Alemanha.</p>
+    <div class="crm">
+      <label for="st-zurique-2">Status</label>
+      <select id="st-zurique-2" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-zurique-2">Notas e observações</label>
+      <textarea id="nt-zurique-2" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="zurique-3">
+  <div class="rank">3</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://www.lustmap.ch" target="_blank" rel="noopener">lustmap.ch</a><div class="visits"><span class="num">97.400</span><span class="unit">visitas/mês (est.)</span><span class="when">Ago/2026</span></div></div>
+    <div class="tipo">Diretório (tipo a confirmar)</div>
+    <a class="url" href="https://www.lustmap.ch" target="_blank" rel="noopener">https://www.lustmap.ch</a>
+    <p class="fonte">Semrush: cerca de 97,4 mil visitas totais (a página não diz se é por mês). Posição 2.304 no ranking da Suíça.</p>
+    <div class="crm">
+      <label for="st-zurique-3">Status</label>
+      <select id="st-zurique-3" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-zurique-3">Notas e observações</label>
+      <textarea id="nt-zurique-3" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="zurique-4">
+  <div class="rank">4</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://www.petitesannonces.ch" target="_blank" rel="noopener">petitesannonces.ch</a><div class="visits"><span class="num">81.000</span><span class="unit">visitas/mês (est.)</span><span class="when">Out/2026</span></div></div>
+    <div class="tipo">Classificados gerais (francês)</div>
+    <a class="url" href="https://www.petitesannonces.ch" target="_blank" rel="noopener">https://www.petitesannonces.ch</a>
+    <p class="fonte">Ahrefs: cerca de 94 mil visitas orgânicas/mês, 86% da Suíça (81 mil). Não é só escort.</p>
+    <div class="crm">
+      <label for="st-zurique-4">Status</label>
+      <select id="st-zurique-4" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-zurique-4">Notas e observações</label>
+      <textarea id="nt-zurique-4" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="zurique-5">
+  <div class="rank">5</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://www.suche.ch" target="_blank" rel="noopener">suche.ch</a><div class="visits"><span class="num">11.700</span><span class="unit">visitas/mês (est.)</span><span class="when">Out/2026</span></div></div>
+    <div class="tipo">Diretório de erotik (Suíça)</div>
+    <a class="url" href="https://www.suche.ch" target="_blank" rel="noopener">https://www.suche.ch</a>
+    <p class="fonte">Ahrefs: cerca de 11,8 mil visitas orgânicas/mês, 98,6% da Suíça. Ranqueia para bordéis e swingerclubs.</p>
+    <div class="crm">
+      <label for="st-zurique-5">Status</label>
+      <select id="st-zurique-5" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-zurique-5">Notas e observações</label>
+      <textarea id="nt-zurique-5" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="zurique-6">
+  <div class="rank">6</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://bemygirl.ch" target="_blank" rel="noopener">bemygirl.ch</a><div class="visits none"><span class="num">sem dado</span><span class="unit">de visitas</span></div></div>
+    <div class="tipo">Diretório de escorts</div>
+    <a class="url" href="https://bemygirl.ch" target="_blank" rel="noopener">https://bemygirl.ch</a>
+    <p class="fonte">Sem dado de visitas. Ranqueia para busca de escort em Zurique e Genebra (Semrush, jan/2026).</p>
+    <div class="crm">
+      <label for="st-zurique-6">Status</label>
+      <select id="st-zurique-6" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-zurique-6">Notas e observações</label>
+      <textarea id="nt-zurique-6" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="zurique-7">
+  <div class="rank">7</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://www.targetescorts.com/zurich-escort.htm" target="_blank" rel="noopener">Target Escorts</a><div class="visits none"><span class="num">sem dado</span><span class="unit">de visitas</span></div></div>
+    <div class="tipo">Agência (Zurique)</div>
+    <a class="url" href="https://www.targetescorts.com/zurich-escort.htm" target="_blank" rel="noopener">https://www.targetescorts.com/zurich-escort.htm</a>
+    <p class="fonte">Sem dado de tráfego. Agência de alto padrão listada no In Your Pocket.</p>
+    <div class="crm">
+      <label for="st-zurique-7">Status</label>
+      <select id="st-zurique-7" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-zurique-7">Notas e observações</label>
+      <textarea id="nt-zurique-7" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="zurique-8">
+  <div class="rank">8</div>
+  <div class="main">
+    <div class="head"><span class="site nolink">Jessica&#x27;s Escort Zürich</span><div class="visits none"><span class="num">sem dado</span><span class="unit">de visitas</span></div></div>
+    <div class="tipo">Agência (Zurique)</div>
+    <span class="url muted">Endereço não encontrado</span>
+    <p class="fonte">Sem dado de tráfego. Aparece no search.ch para busca de escort em Zurique. Endereço do site não encontrado.</p>
+    <div class="crm">
+      <label for="st-zurique-8">Status</label>
+      <select id="st-zurique-8" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-zurique-8">Notas e observações</label>
+      <textarea id="nt-zurique-8" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="zurique-9">
+  <div class="rank">9</div>
+  <div class="main">
+    <div class="head"><span class="site nolink">Sugar Escort Babes</span><div class="visits none"><span class="num">sem dado</span><span class="unit">de visitas</span></div></div>
+    <div class="tipo">Agência (Zurique)</div>
+    <span class="url muted">Endereço não encontrado</span>
+    <p class="fonte">Sem dado de tráfego. Aparece no search.ch para busca de escort em Zurique. Endereço do site não encontrado.</p>
+    <div class="crm">
+      <label for="st-zurique-9">Status</label>
+      <select id="st-zurique-9" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-zurique-9">Notas e observações</label>
+      <textarea id="nt-zurique-9" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="zurique-10">
+  <div class="rank">10</div>
+  <div class="main">
+    <div class="head"><span class="site nolink">Ivana Models Escort Service</span><div class="visits none"><span class="num">sem dado</span><span class="unit">de visitas</span></div></div>
+    <div class="tipo">Agência (Zurique)</div>
+    <span class="url muted">Endereço não encontrado</span>
+    <p class="fonte">Sem dado de tráfego. Aparece no search.ch para busca de escort em Zurique. Endereço do site não encontrado.</p>
+    <div class="crm">
+      <label for="st-zurique-10">Status</label>
+      <select id="st-zurique-10" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-zurique-10">Notas e observações</label>
+      <textarea id="nt-zurique-10" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article>
+<article class="card" data-key="zurique-11">
+  <div class="rank">11</div>
+  <div class="main">
+    <div class="head"><a class="site" href="https://search.ch/tel/Zurich/escort" target="_blank" rel="noopener">search.ch (diretório)</a><div class="visits none"><span class="num">sem dado</span><span class="unit">de visitas</span></div></div>
+    <div class="tipo">Diretório telefônico local</div>
+    <a class="url" href="https://search.ch/tel/Zurich/escort" target="_blank" rel="noopener">https://search.ch/tel/Zurich/escort</a>
+    <p class="fonte">Sem dado de tráfego. É onde várias agências de Zurique aparecem na busca.</p>
+    <div class="crm">
+      <label for="st-zurique-11">Status</label>
+      <select id="st-zurique-11" class="status"><option>A pesquisar</option><option>Em análise</option><option>Contato feito</option><option>Parceiro/cliente</option><option>Descartado</option></select>
+      <label for="nt-zurique-11">Notas e observações</label>
+      <textarea id="nt-zurique-11" class="notes" rows="3" placeholder="Escreva aqui"></textarea>
+    </div>
+  </div>
+</article></div>
+</section>
+
+<section id="refazer">
+  <h2>Como refazer e completar</h2>
+  <div class="panel">
+    <ol>
+      <li>No Semrush ou no Ahrefs, escolha a base de dados <strong>UK</strong> para Londres e <strong>CH</strong> para Zurique.</li>
+      <li>Pesquise no idioma local. Londres: "escorts london", "london escort agency". Zurique, em alemão: "escort zürich", "begleitservice zürich".</li>
+      <li>Para o recorte por cidade, use o Keyword Planner do Google filtrando a cidade e pesquise no Google com a localização simulada por VPN.</li>
+      <li>Confira também o Google Maps (as agências aparecem ali) e o Meta Ad Library para ver quem anuncia na região.</li>
+      <li>Digite o número de visitas que achar na nota do site, para comparar com a estimativa daqui.</li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <h2>Suas anotações</h2>
+  <div class="panel">
+    <p>As notas e os status ficam salvos só neste navegador, neste aparelho. Use o botão abaixo para copiar tudo e guardar em outro lugar.</p>
+    <div class="tools">
+      <button type="button" id="copy">Copiar todas as notas</button>
+      <button type="button" class="ghost" id="clear">Apagar tudo daqui</button>
+      <span class="msg" id="msg" role="status"></span>
+    </div>
+  </div>
+</section>
+
+<footer>Fontes: páginas públicas de visão geral do Semrush, do Ahrefs e do Similarweb, e os diretórios search.ch e In Your Pocket. Dados mais recentes encontrados em 18/11/2026: de ago/2026 a out/2026 para a maioria dos sites. Os marcados como antigos (nov/2025) não tinham versão mais nova nas páginas públicas. As ferramentas ainda não publicaram novembro/2026.</footer>
+</div>
+
+<script>
+(function () {
+  var PREFIX = "radar-londres-zurique:";
+  var cards = Array.prototype.slice.call(document.querySelectorAll(".card"));
+  function get(k) { try { return localStorage.getItem(PREFIX + k); } catch (e) { return null; } }
+  function set(k, v) { try { localStorage.setItem(PREFIX + k, v); } catch (e) {} }
+  cards.forEach(function (c) {
+    var key = c.getAttribute("data-key");
+    var st = c.querySelector(".status");
+    var nt = c.querySelector(".notes");
+    var s = get(key + ":status"); if (s) st.value = s;
+    var n = get(key + ":notes"); if (n) nt.value = n;
+    st.addEventListener("change", function () { set(key + ":status", st.value); });
+    nt.addEventListener("input", function () { set(key + ":notes", nt.value); });
+  });
+  var msg = document.getElementById("msg");
+  document.getElementById("copy").addEventListener("click", function () {
+    var out = cards.map(function (c) {
+      var name = c.querySelector(".site").textContent.trim();
+      var st = c.querySelector(".status").value;
+      var nt = c.querySelector(".notes").value.trim();
+      return name + " | " + st + (nt ? " | " + nt : "");
+    }).join("\n");
+    try {
+      navigator.clipboard.writeText(out).then(function () { msg.textContent = "Copiado."; }, function () { msg.textContent = "Não consegui copiar. Selecione o texto e copie manualmente."; });
+    } catch (e) { msg.textContent = "Não consegui copiar. Selecione o texto e copie manualmente."; }
+  });
+  document.getElementById("clear").addEventListener("click", function () {
+    cards.forEach(function (c) {
+      var key = c.getAttribute("data-key");
+      try { localStorage.removeItem(PREFIX + key + ":status"); localStorage.removeItem(PREFIX + key + ":notes"); } catch (e) {}
+      c.querySelector(".status").selectedIndex = 0;
+      c.querySelector(".notes").value = "";
+    });
+    msg.textContent = "Notas apagadas.";
+  });
+})();
+</script>
+</body>
+</html>
